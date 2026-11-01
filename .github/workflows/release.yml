@@ -1,0 +1,93 @@
+name: Release Gates - Staging to Production
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: customer-portal-release
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate release candidate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run automated tests
+        run: npm test
+
+      - name: Package site artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: customer-portal-site
+          path: site/
+          if-no-files-found: error
+
+  deploy-staging:
+    name: Deploy to staging
+    needs: validate
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Download validated artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: customer-portal-site
+          path: site
+
+      - name: Mark build as staging
+        run: sed -i 's/__ENVIRONMENT__/STAGING/' site/index.html
+
+      - name: Publish staging site
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./site
+          publish_branch: gh-pages
+          destination_dir: staging
+          keep_files: true
+
+  deploy-production:
+    name: Promote to production
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Download the same validated artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: customer-portal-site
+          path: site
+
+      - name: Mark build as production
+        run: sed -i 's/__ENVIRONMENT__/PRODUCTION/' site/index.html
+
+      - name: Publish production site
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./site
+          publish_branch: gh-pages
+          destination_dir: production
+          keep_files: true

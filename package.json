@@ -1,0 +1,9 @@
+{
+  "name": "release-gates-demo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A small static site used to demonstrate staging-to-production release gates with GitHub Actions.",
+  "scripts": {
+    "test": "node --test"
+  }
+}
